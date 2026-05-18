@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="#{titulo.gestion.turnos}">Gestión de Turnos</title>
+    <style>
+        body {
+          font-family: Arial, sans-serif;
+          background: #f9f9f9;
+          padding: 20px;
+        }
+        h2 {
+          background: gold;
+          padding: 10px;
+          border-radius: 5px;
+        }
+        form {
+          margin-bottom: 20px;
+          padding: 15px;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          background: white;
+        }
+        label, input, select, button {
+          display: block;
+          margin: 5px 0;
+          width: 100%;
+          padding: 6px;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 10px;
+        }
+        th, td {
+          padding: 8px;
+          border: 1px solid #ccc;
+        }
+        .section {
+          margin-bottom: 50px;
+        }
+        button.edit, button.delete {
+          margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+<h1 th:text="#{titulo.gestion.turnos}">Gestión de Turnos - Clínica</h1>
+<div style="text-align: right; margin-bottom: 10px;">
+    <form action="/logout" method="post">
+        <button type="submit" style="background-color: red; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer;"
+                th:text="#{boton.cerrar.sesion}">Cerrar sesión</button>
+    </form>
+</div>
+
+<!-- Pacientes -->
+<div class="section">
+    <h2 th:text="#{titulo.pacientes}">Pacientes</h2>
+    <form id="pacienteForm">
+        <input type="hidden" id="pacienteId">
+        <label th:text="#{label.nombre}">Nombre:</label>
+        <input type="text" id="pacienteNombre" required>
+        <label th:text="#{label.identificacion}">Identificación:</label>
+        <input type="text" id="pacienteIdentificacion" required>
+        <label th:text="#{label.telefono}">Teléfono:</label>
+        <input type="text" id="pacienteTelefono" required>
+        <button type="submit" th:text="#{boton.guardar.paciente}">Guardar Paciente</button>
+    </form>
+    <table id="pacientesTable">
+        <thead>
+        <tr>
+            <th th:text="#{label.nombre}">Nombre</th>
+            <th th:text="#{label.identificacion}">Identificación</th>
+            <th th:text="#{label.telefono}">Teléfono</th>
+            <th th:text="#{label.acciones}">Acciones</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<!-- Médicos -->
+<div class="section">
+    <h2 th:text="#{titulo.medicos}">Médicos</h2>
+    <form id="medicoForm">
+        <input type="hidden" id="medicoId">
+        <label th:text="#{label.nombre}">Nombre:</label>
+        <input type="text" id="medicoNombre" required>
+        <label th:text="#{label.especialidad}">Especialidad:</label>
+        <input type="text" id="medicoEspecialidad" required>
+        <label th:text="#{label.telefono}">Teléfono:</label>
+        <input type="text" id="medicoTelefono" required>
+        <button type="submit" th:text="#{boton.guardar.medico}">Guardar Médico</button>
+    </form>
+    <table id="medicosTable">
+        <thead>
+        <tr>
+            <th th:text="#{label.nombre}">Nombre</th>
+            <th th:text="#{label.especialidad}">Especialidad</th>
+            <th th:text="#{label.telefono}">Teléfono</th>
+            <th th:text="#{label.acciones}">Acciones</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<!-- Turnos -->
+<div class="section">
+    <h2 th:text="#{titulo.turnos}">Turnos</h2>
+    <form id="turnoForm">
+        <input type="hidden" id="turnoId">
+        <label th:text="#{label.fecha}">Fecha:</label>
+        <input type="date" id="turnoFecha" required>
+        <label th:text="#{label.hora}">Hora:</label>
+        <input type="time" id="turnoHora" required>
+        <label th:text="#{label.paciente}">Paciente:</label>
+        <select id="turnoPaciente"></select>
+        <label th:text="#{label.medico}">Médico:</label>
+        <select id="turnoMedico"></select>
+        <button type="submit" th:text="#{boton.guardar.turno}">Guardar Turno</button>
+    </form>
+    <table id="turnosTable">
+        <thead>
+        <tr>
+            <th th:text="#{label.fecha}">Fecha</th>
+            <th th:text="#{label.hora}">Hora</th>
+            <th th:text="#{label.paciente}">Paciente</th>
+            <th th:text="#{label.medico}">Médico</th>
+            <th th:text="#{label.acciones}">Acciones</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<!-- Enfermedades (API Clinical Table) -->
+<div class="section">
+    <h2>Buscar Enfermedades (API Clinical Table)</h2>
+    <form id="formEnfermedades">
+        <input type="text" id="terminoEnfermedad" placeholder="Ej: diabetes" required>
+        <button type="submit">Buscar</button>
+    </form>
+    <ul id="listaEnfermedades"></ul>
+</div>
+
+
+
+<script>
+    const urlBase = '';
+
+    // Función común para fetch con manejo de errores
+    const fetchData = async (url, options = {}) => {
+      const res = await fetch(url, options);
+      return res.ok ? res.json() : Promise.reject(await res.text());
+    };
+
+    // ------------------------ PACIENTES ------------------------
+    const pacienteForm = document.getElementById('pacienteForm');
+    const pacientesTable = document.querySelector('#pacientesTable tbody');
+
+    const cargarPacientes = async () => {
+      const pacientes = await fetchData('/api/pacientes');
+      pacientesTable.innerHTML = '';
+      pacientes.forEach(p => {
+        pacientesTable.innerHTML += `
+          <tr>
+            <td>${p.nombre}</td>
+            <td>${p.identificacion}</td>
+            <td>${p.telefono}</td>
+            <td>
+              <button class="edit" onclick='editarPaciente(${JSON.stringify(p)})'>Editar</button>
+              <button class="delete" onclick='eliminarPaciente(${p.id})'>Eliminar</button>
+            </td>
+          </tr>`;
+        document.getElementById('turnoPaciente').innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
+      });
+    };
+
+    pacienteForm.onsubmit = async e => {
+      e.preventDefault();
+      const data = {
+        nombre: pacienteForm.pacienteNombre.value,
+        identificacion: pacienteForm.pacienteIdentificacion.value,
+        telefono: pacienteForm.pacienteTelefono.value,
+      };
+      const id = pacienteForm.pacienteId.value;
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `/api/pacientes/${id}` : '/api/pacientes';
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      pacienteForm.reset();
+      cargarPacientes();
+    };
+
+    const editarPaciente = p => {
+      pacienteForm.pacienteId.value = p.id;
+      pacienteForm.pacienteNombre.value = p.nombre;
+      pacienteForm.pacienteIdentificacion.value = p.identificacion;
+      pacienteForm.pacienteTelefono.value = p.telefono;
+    };
+
+    const eliminarPaciente = async id => {
+      await fetch(`/api/pacientes/${id}`, { method: 'DELETE' });
+      cargarPacientes();
+    };
+
+    // ------------------------ MÉDICOS ------------------------
+    const medicoForm = document.getElementById('medicoForm');
+    const medicosTable = document.querySelector('#medicosTable tbody');
+
+    const cargarMedicos = async () => {
+      const medicos = await fetchData('/api/medicos');
+      medicosTable.innerHTML = '';
+      document.getElementById('turnoMedico').innerHTML = '';
+      medicos.forEach(m => {
+        medicosTable.innerHTML += `
+          <tr>
+            <td>${m.nombre}</td>
+            <td>${m.especialidad}</td>
+            <td>${m.telefono}</td>
+            <td>
+              <button class="edit" onclick='editarMedico(${JSON.stringify(m)})'>Editar</button>
+              <button class="delete" onclick='eliminarMedico(${m.id})'>Eliminar</button>
+            </td>
+          </tr>`;
+        document.getElementById('turnoMedico').innerHTML += `<option value="${m.id}">${m.nombre}</option>`;
+      });
+    };
+
+    medicoForm.onsubmit = async e => {
+      e.preventDefault();
+      const data = {
+        nombre: medicoForm.medicoNombre.value,
+        especialidad: medicoForm.medicoEspecialidad.value,
+        telefono: medicoForm.medicoTelefono.value,
+      };
+      const id = medicoForm.medicoId.value;
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `/api/medicos/${id}` : '/api/medicos';
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      medicoForm.reset();
+      cargarMedicos();
+    };
+
+    const editarMedico = m => {
+      medicoForm.medicoId.value = m.id;
+      medicoForm.medicoNombre.value = m.nombre;
+      medicoForm.medicoEspecialidad.value = m.especialidad;
+      medicoForm.medicoTelefono.value = m.telefono;
+    };
+
+    const eliminarMedico = async id => {
+      await fetch(`/api/medicos/${id}`, { method: 'DELETE' });
+      cargarMedicos();
+    };
+
+    // ------------------------ TURNOS ------------------------
+    const turnoForm = document.getElementById('turnoForm');
+    const turnosTable = document.querySelector('#turnosTable tbody');
+
+    const cargarTurnos = async () => {
+      const turnos = await fetchData('/api/turnos');
+      turnosTable.innerHTML = '';
+      turnos.forEach(t => {
+        turnosTable.innerHTML += `
+          <tr>
+            <td>${t.fecha}</td>
+            <td>${t.hora}</td>
+            <td>${t.paciente.nombre}</td>
+            <td>${t.medico.nombre}</td>
+            <td>
+              <button class="delete" onclick='eliminarTurno(${t.id})'>Eliminar</button>
+            </td>
+          </tr>`;
+      });
+    };
+
+    turnoForm.onsubmit = async e => {
+      e.preventDefault();
+      const data = {
+        fecha: turnoForm.turnoFecha.value,
+        hora: turnoForm.turnoHora.value,
+        pacienteId: turnoForm.turnoPaciente.value,
+        medicoId: turnoForm.turnoMedico.value,
+      };
+      await fetch('/api/turnos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      turnoForm.reset();
+      cargarTurnos();
+    };
+
+    const eliminarTurno = async id => {
+      await fetch(`/api/turnos/${id}`, { method: 'DELETE' });
+      cargarTurnos();
+    };
+
+ // ------------------------ ENFERMEDADES (API Clinical Table) ------------------------
+const formEnfermedades = document.getElementById("formEnfermedades");
+const listaEnfermedades = document.getElementById("listaEnfermedades");
+
+formEnfermedades.addEventListener("submit", async e => {
+  e.preventDefault();
+  const termino = document.getElementById("terminoEnfermedad").value;
+
+  try {
+    const res = await fetch(`/api/externa/enfermedades?termino=${termino}`);
+    const data = await res.json();
+
+    listaEnfermedades.innerHTML = "";
+
+    // data[3] contiene la lista de nombres de enfermedades
+    if (data && data[3] && data[3].length > 0) {
+      data[3].forEach(nombre => {
+        listaEnfermedades.innerHTML += `<li>${nombre}</li>`;
+      });
+    } else {
+      listaEnfermedades.innerHTML = "<li>No se encontraron resultados</li>";
+    }
+
+  } catch (error) {
+    console.error("Error al buscar enfermedades:", error);
+    listaEnfermedades.innerHTML = "<li>Error al buscar enfermedades</li>";
+  }
+});
+
+
+    // Inicializar
+    cargarPacientes();
+    cargarMedicos();
+    cargarTurnos();
+</script>
+</body>
+</html>
